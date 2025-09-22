@@ -3,7 +3,12 @@ title: Quarto Computations
 echo: false
 fig-height: 3.5
 fig-width: 6
+format:
+    html:
+        embed-resources: true
 ---
+
+<https://github.com/ohatakm>
 
 This dataset contains a subset of the fuel economy data from the EPA.
 
