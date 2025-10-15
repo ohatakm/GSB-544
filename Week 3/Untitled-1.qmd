@@ -1,0 +1,14 @@
+---
+title: "Lab 3 - The 12 Days of Christmas"
+author: "Kelly Ohata"
+format:
+    html:
+        embed-resources: true
+---
+
+
+```{python}
+# | code-fold: true
+import pandas as pd
+xmas = pd.read_csv("https://www.dropbox.com/scl/fi/qxaslqqp5p08i1650rpc4/xmas.csv?rlkey=erdxi7jbh7pqf9fh4lv4cayp5&dl=1")
+```
