@@ -2207,7 +2207,7 @@ vertical-align: -.125em;
 </header>
 
 
-<div id="babe851d" class="cell" data-execution_count="1">
+<div id="b26116ba" class="cell" data-execution_count="1">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
@@ -2216,7 +2216,7 @@ vertical-align: -.125em;
 </div>
 <section id="function-1-pluralize_gift" class="level2">
 <h2 class="anchored" data-anchor-id="function-1-pluralize_gift">Function 1: pluralize_gift()</h2>
-<div id="c1f636dd" class="cell" data-execution_count="2">
+<div id="8f701df4" class="cell" data-execution_count="2">
 <div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> pluralize_gift(gift):</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">&quot;&quot;&quot;</span></span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="co">    Returns plural of a noun</span></span>
@@ -2249,7 +2249,7 @@ vertical-align: -.125em;
 </section>
 <section id="function-2-make_phrase" class="level2">
 <h2 class="anchored" data-anchor-id="function-2-make_phrase">Function 2: make_phrase()</h2>
-<div id="39976db4" class="cell" data-execution_count="3">
+<div id="503f582e" class="cell" data-execution_count="3">
 <div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> make_phrase(num, num_word, item, verb, adjective, location):</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">&quot;&quot;&quot;</span></span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="co">    Returns a phrase describing a gift for a given day of Christmas.</span></span>
@@ -2382,7 +2382,7 @@ vertical-align: -.125em;
 </section>
 <section id="function-3-sing_day" class="level2">
 <h2 class="anchored" data-anchor-id="function-3-sing_day">Function 3: sing_day()</h2>
-<div id="e2ca9c61" class="cell" data-execution_count="4">
+<div id="f2b5991a" class="cell" data-execution_count="4">
 <div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> sing_day(dataset, num, phrase_col):</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">&quot;&quot;&quot;</span></span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="co">    Returns the lyrics for a given day of &#39;The 12 Days of Christmas&#39;.</span></span>
@@ -2432,7 +2432,7 @@ and a partridge in a pear tree.</code></pre>
 </section>
 <section id="entire-output" class="level2">
 <h2 class="anchored" data-anchor-id="entire-output">Entire Output</h2>
-<div id="15e30770" class="cell" data-execution_count="5">
+<div id="d67cbb7d" class="cell" data-execution_count="5">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>song <span class="op">=</span> [sing_day(xmas, i, <span class="st">&quot;Full.Phrase&quot;</span>) <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">1</span>, <span class="bu">len</span>(xmas) <span class="op">+</span> <span class="dv">1</span>)]</span>
@@ -2547,7 +2547,7 @@ and a partridge in a pear tree.</code></pre>
 </section>
 <section id="surprise-song" class="level2">
 <h2 class="anchored" data-anchor-id="surprise-song">Surprise Song</h2>
-<div id="e53e1f9c" class="cell" data-execution_count="6">
+<div id="73606767" class="cell" data-execution_count="6">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>xmas2 <span class="op">=</span> pd.read_csv(<span class="st">&quot;https://www.dropbox.com/scl/fi/p9x9k8xwuzs9rhp582vfy/xmas_2.csv?rlkey=kvc3j3lmyn4opcidsrhcmrof1&amp;dl=1&quot;</span>)</span>
