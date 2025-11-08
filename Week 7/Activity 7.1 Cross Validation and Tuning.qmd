@@ -1,0 +1,304 @@
+---
+title: "Activity 7.1 - Cross-Validation and Tuning"
+Author: "Kelly Ohata"
+format:
+    html:
+        embed-resources: true
+        number-sections: true
+        code-fold: show
+
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+```{python}
+# | code-fold: true
+import pandas as pd
+import numpy as np
+from sklearn.pipeline import Pipeline, FeatureUnion
+from sklearn.compose import ColumnTransformer
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import StandardScaler, OneHotEncoder, PolynomialFeatures
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import train_test_split, cross_val_score, GridSearchCV
+from sklearn.metrics import mean_squared_error
+
+ames = pd.read_csv('AmesHousing.csv')
+
+ames.head()
+```
+
+```{python}
+ames.columns
+```
+## Part 1
+Consider four possible models for predicting house prices:
+
+1. Using only the size and number of rooms.
+2. Using size, number of rooms, and building type.
+3. Using size and building type, and their interaction.
+4. Using a 5-degree polynomial on size, a 5-degree polynomial on number of rooms, and also building type.
+5. Set up a pipeline for each of these four models.
+
+Then, get predictions on the test set for each of your pipelines, and compute the root mean squared error. Which model performed best?
+
+*Note: You should only use the function train_test_split() one time in your code; that is, we should be predicting on the same test set for all three models.*
+
+```{python}
+X = ames.drop('SalePrice', axis = 1)
+y = ames['SalePrice']
+X_train, X_test, y_train, y_test = train_test_split(X, y)
+```
+
+### Model 1
+```{python}
+ct1 = ColumnTransformer([
+    ("standardize", StandardScaler(), ["Gr Liv Area", "TotRms AbvGrd"])
+], remainder = "drop")
+
+pipe1 = Pipeline([
+    ("preprocessing", ct1),
+    ("linear_regression", LinearRegression())
+])
+
+pipe1_fitted = pipe1.fit(X_train, y_train)
+preds1 = pipe1_fitted.predict(X_test)
+rmse1 = np.sqrt(mean_squared_error(y_test, preds1))
+rmse1
+```
+
+### Model 2
+
+```{python}
+ct2 = ColumnTransformer([
+    ("dummify", OneHotEncoder(handle_unknown = "ignore"), ["Bldg Type"]),
+    ("standardize", StandardScaler(), ["Gr Liv Area", "TotRms AbvGrd"])], remainder = "drop")
+
+pipe2 = Pipeline([
+    ("preprocessing", ct2),
+    ("linear_regression", LinearRegression())])
+
+pipe2_fitted = pipe2.fit(X_train, y_train)
+preds2 = pipe2_fitted.predict(X_test)
+rmse2 = np.sqrt(mean_squared_error(y_test, preds2))
+rmse2
+```
+
+### Model 3
+```{python}
+ct3 = ColumnTransformer([
+    ("dummify", OneHotEncoder(handle_unknown = "ignore"), ["Bldg Type"]),
+    ("interaction", PolynomialFeatures(interaction_only = True), ["Gr Liv Area"])], remainder = "drop")
+
+pipe3 = Pipeline([
+    ("preprocessing", ct3),
+    ("linear_regression", LinearRegression())
+])
+
+pipe3_fitted = pipe3.fit(X_train, y_train)
+preds3 = pipe3_fitted.predict(X_test)
+rmse3 = np.sqrt(mean_squared_error(y_test, preds3))
+rmse3
+```
+
+### Model 4
+
+```{python}
+ct4 = ColumnTransformer([
+    ("dummify", OneHotEncoder(handle_unknown = "ignore"), ["Bldg Type"]),
+    ("poly", PolynomialFeatures(degree = 5), ["Gr Liv Area", "TotRms AbvGrd"])], remainder = "drop")
+
+pipe4 = Pipeline([
+    ("preprocessing", ct4),
+    ("linear_regression", LinearRegression())
+])
+
+pipe4_fitted = pipe4.fit(X_train, y_train)
+preds4 = pipe4_fitted.predict(X_test)
+rmse4 = np.sqrt(mean_squared_error(y_test, preds4))
+rmse4
+```
+
+```{python}
+results = pd.DataFrame({
+    "Model": [
+        "1. Size + Rooms",
+        "2. Size + Rooms + Building Type",
+        "3. Size + Building Type + Interaction",
+        "4. 5-Degree Polynomial (Size & Rooms + Building Type)"
+    ],
+    "RMSE": [rmse1, rmse2, rmse3, rmse4]
+})
+
+results
+```
+Model 2(Size + Rooms + Building Type) performed the best because its RMSE is the lowest out of all of them.
+
+
+
+## Part 2
+Once again consider four modeling options for house price:
+
+1. Using only the size and number of rooms.
+2. Using size, number of rooms, and building type.
+3. Using size and building type, and their interaction.
+4. Using a 5-degree polynomial on size, a 5-degree polynomial on number of rooms, and also building type.
+5. Use cross_val_score with the pipelines you made earlier to find the cross-validated root mean squared error for each model.
+
+Which do you prefer? Does this agree with your conclusion from earlier?
+
+### Model 1
+```{python}
+ct1 = ColumnTransformer([
+    ("standardize", StandardScaler(), ["Gr Liv Area", "TotRms AbvGrd"])
+], remainder = "drop")
+
+pipe1 = Pipeline([
+    ("preprocessing", ct1),
+    ("linear_regression", LinearRegression())
+])
+
+scores1 = cross_val_score(pipe1,
+                          X = X,
+                          y = y,
+                          scoring = "neg_mean_squared_error",
+                          cv = 5)
+rmse1 = np.sqrt(-scores1.mean())
+rmse1
+```
+
+### Model 2
+
+```{python}
+ct2 = ColumnTransformer([
+    ("dummify", OneHotEncoder(handle_unknown = "ignore"), ["Bldg Type"]),
+    ("standardize", StandardScaler(), ["Gr Liv Area", "TotRms AbvGrd"])
+], remainder = "drop")
+
+pipe2 = Pipeline([
+    ("preprocessing", ct2),
+    ("linear_regression", LinearRegression())
+])
+
+scores2 = cross_val_score(pipe2,
+                          X = X,
+                          y = y,
+                          scoring = "neg_mean_squared_error",
+                          cv = 5)
+rmse2 = np.sqrt(-scores2.mean())
+rmse2
+```
+### Model 3
+
+```{python}
+ct3 = ColumnTransformer([
+    ("dummify", OneHotEncoder(handle_unknown = "ignore"), ["Bldg Type"]),
+    ("interaction", PolynomialFeatures(interaction_only = True), ["Gr Liv Area"])
+], remainder = "drop")
+
+pipe3 = Pipeline([
+    ("preprocessing", ct3),
+    ("linear_regression", LinearRegression())
+])
+
+scores3 = cross_val_score(pipe3,
+                          X = X,
+                          y = y,
+                          scoring = "neg_mean_squared_error",
+                          cv = 5)
+rmse3 = np.sqrt(-scores3.mean())
+rmse3
+```
+### Model 4
+
+```{python}
+ct4 = ColumnTransformer([
+    ("dummify", OneHotEncoder(handle_unknown = "ignore"), ["Bldg Type"]),
+    ("poly", PolynomialFeatures(degree = 5), ["Gr Liv Area", "TotRms AbvGrd"])
+], remainder = "drop")
+
+pipe4 = Pipeline([
+    ("preprocessing", ct4),
+    ("linear_regression", LinearRegression())
+])
+
+scores4 = cross_val_score(pipe4,
+                          X = X,
+                          y = y,
+                          scoring = "neg_mean_squared_error",
+                          cv = 5)
+rmse4 = np.sqrt(-scores4.mean())
+rmse4
+```
+
+```{python}
+results = pd.DataFrame({
+    "Model": [
+        "1. Size + Rooms",
+        "2. Size + Rooms + Building Type",
+        "3. Size + Building Type + Interaction",
+        "4. 5-Degree Poly (Size & Rooms + Building Type)"
+    ],
+    "Cross-Validated RMSE": [rmse1, rmse2, rmse3, rmse4]
+})
+
+results
+```
+Consider one hundred modeling options for house price:
+
+I still prefer Model 2(Size + Rooms + Building Type, the same as the first part) because it has the lowest RMSE.
+
+## Part 3
+1. House size, trying degrees 1 through 10
+2. Number of rooms, trying degrees 1 through 10
+3. Building Type
+Hint: The dictionary of possible values that you make to give to GridSearchCV will have two elements instead of one.
+
+```{python}
+ct_poly = ColumnTransformer([
+    ("dummify", OneHotEncoder(handle_unknown = "ignore"), ["Bldg Type"]),
+    ("poly_size", PolynomialFeatures(), ["Gr Liv Area"]),
+    ("poly_rooms", PolynomialFeatures(), ["TotRms AbvGrd"])
+], remainder = "drop")
+
+# Build pipeline
+lr_pipeline_poly = Pipeline([
+    ("preprocessing", ct_poly),
+    ("linear_regression", LinearRegression())
+])
+
+# Define degrees (1–10 for both predictors)
+param_grid = {
+    "preprocessing__poly_size__degree": np.arange(1, 11),
+    "preprocessing__poly_rooms__degree": np.arange(1, 11)
+}
+
+# grid search with 5-fold cross-validation
+gscv = GridSearchCV(lr_pipeline_poly,
+                    param_grid = param_grid,
+                    cv = 5,
+                    scoring = "r2")
+
+gscv.fit(X, y)
+
+df_results = pd.DataFrame(gscv.cv_results_)
+
+df_results[["param_preprocessing__poly_size__degree",
+            "param_preprocessing__poly_rooms__degree",
+            "mean_test_score"]]
+
+```
+
+```{python}
+best_row = df_results.loc[df_results["mean_test_score"].idxmax()]
+
+best_row
+```
+**Q1: Which model performed the best?**
+Model 1 performed the best.
+
+**Q2: What downsides do you see of trying all possible model options? How might you go about choosing a smaller number of tuning values to try?**
+
+Trying all possible models takes a lot of time and computational power, especially as the number of parameters increases. It’s better to test a smaller, smarter range of values based on past results or domain knowledge to save time and avoid overfitting.

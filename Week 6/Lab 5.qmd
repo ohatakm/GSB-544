@@ -1,0 +1,467 @@
+---
+title: "Lab 5 - Insurance Costs"
+author: "Kelly Ohata"
+format:
+  html:
+    toc: true
+    embed-resources: true
+    code-fold: show
+    number-sections: true
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+```{python}
+# | code-fold: true 
+import pandas as pd
+import numpy as np
+from plotnine import *
+
+```
+## Part One: Data Exploration
+```{python}
+myData =  pd.read_csv("https://www.dropbox.com/s/bocjjyo1ehr5auz/insurance_costs_1.csv?dl=1")
+myData = pd.get_dummies(myData, columns = ["sex","smoker"],drop_first=True)
+myData["sex_male"] = myData["sex_male"].astype(int)
+myData["smoker_yes"] = myData["smoker_yes"].astype(int)
+myData["smoker_label"] = myData["smoker_yes"].map({0:"No", 1:"Yes"})
+myData["sex_label"] = myData["sex_male"].map({0: "Female", 1: "Male"})
+
+myData = myData.dropna()
+```
+
+
+```{python}
+# Scatter Plot - Age vs Charges
+(
+    ggplot(myData, aes(x="age", y="charges"))
+    +geom_point(alpha = 0.7)
+    +labs(title = "Age vs. Charges", x = "Age", y = "Charges")
+    +scale_y_continuous(name="Charges", limits = (0,60000), breaks = range(0,60001,10000))
+    +theme_bw()
+)
+```
+
+
+```{python}
+# Box Plot - Smoker vs Chargers
+(
+    ggplot(myData, aes(x="smoker_label", y="charges"))
+    +geom_boxplot(alpha = 0.7)
+    +labs(title = "Smoker vs. Charges", x = "Smoker", y = "Charges")
+    +scale_y_continuous(name="Charges", limits = (0,60000), breaks = range(0,60001,10000))
+    +theme_bw()
+)
+```
+
+
+```{python}
+
+# Box Plot - Sex vs Charges
+
+(
+    ggplot(myData, aes(x="sex_label", y="charges"))
+    +geom_boxplot(alpha = 0.7)
+    +labs(title = "Sex vs. Charges", x = "Smoker", y = "Charges")
+    +scale_y_continuous(name="Charges", limits = (0,60000), breaks = range(0,60001,10000))
+    +theme_bw()
+)
+```
+
+## Part Two: Simple Linear Models
+```{python}
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error
+```
+
+
+```{python}
+# Model 1: Charges ~ Age
+x1 = myData[["age"]]
+y = myData["charges"]
+
+m1 = LinearRegression()
+m1.fit(x1,y)
+
+y1_predict = m1.predict(x1)
+
+print("Model 1 Intercept: ",m1.intercept_ )
+print("Model 1 Slope: ", m1.coef_)
+print("Model 1 R^2:", m1.score(x1,y))
+print("Model 1 MSE: ",mean_squared_error(y,y1_predict))
+
+```
+
+
+```{python}
+# Model 2: Charges ~ Age + Sex
+x2 = myData[["age","sex_male"]]
+y = myData["charges"]
+
+m2 = LinearRegression()
+m2.fit(x2,y)
+
+y2_predict = m2.predict(x2)
+
+print("Model 2 - Charges ~ Age + Sex")
+print("Model 2 Intercept: ",m2.intercept_ )
+print("Model 2 Slope: ", m2.coef_)
+print("Model 2 R^2:", m2.score(x2,y))
+print("Model 2 MSE: ",mean_squared_error(y,y2_predict))
+
+```
+
+
+```{python}
+# Model 3:  Charges ~ Age + Smoker
+x3 = myData[["age","smoker_yes"]]
+y = myData["charges"]
+
+m3 = LinearRegression()
+m3.fit(x3,y)
+
+y3_predict = m3.predict(x3)
+
+print("Model 3 - Charges ~ Age + Smoker")
+print("Model 3 Intercept: ",m3.intercept_ )
+print("Model 3 Slope: ", m3.coef_)
+print("Model 3 R^2:", m3.score(x3,y))
+print("Model 3 MSE: ",mean_squared_error(y,y3_predict))
+
+```
+
+Model 3 provdes a better fit for the data compared to Model 2 because Model 3 has a greater R-squared and a lower MSE.
+
+## Part Three: Multiple Linear Models
+
+```{python}
+# Model 4: Charges ~ Age + BMI
+from sklearn.metrics import r2_score
+x4 = myData[["age","bmi"]]
+y = myData["charges"]
+
+m4 = LinearRegression()
+m4.fit(x4,y)
+
+y4_predict = m4.predict(x4)
+
+print("Model 4 - Charges ~ Age + BMI")
+print("Model 4 Intercept: ",m4.intercept_ )
+print("Model 4 Slope: ", m4.coef_)
+print("Model 4 R^2:", m4.score(x4,y))
+print("Model 4 MSE: ",mean_squared_error(y,y4_predict))
+```
+
+
+Comparing Model 4 (Age + BMI) to Model 1 (Age), there is slight change in the R-squared value, increased from 0.099 to 0.120. The MSE value changes from 126.7 million to 126.8 million. While BMI does seem to have some explanatory power, it is not strong.
+
+```{python}
+# Model 5: Charges ~ Age + Age^2
+myData["age^2"] = myData["age"]**2
+x5 = myData[["age","age^2"]]
+y = myData["charges"]
+
+m5 = LinearRegression()
+m5.fit(x5,y)
+
+y5_predict = m5.predict(x5)
+
+print("Model 5 - Charges ~ Age + Age^2")
+print("Model 5 Intercept: ",m5.intercept_ )
+print("Model 5 Slope: ", m5.coef_)
+print("Model 5 R^2:", m5.score(x5,y))
+print("Model 5 MSE: ",mean_squared_error(y,y5_predict))
+
+```
+
+There's no change in the R^2 between Model 5 (Age + Age^2) and Model 1 (Age) and only a slight change in the MSE.
+
+
+```{python}
+# Model 6: Polynomial Model of Degree 4
+from sklearn.preprocessing import PolynomialFeatures
+degree4 = PolynomialFeatures(degree=4, include_bias=False)
+
+x6_degree4 = degree4.fit_transform(myData[["age"]])
+y = myData["charges"]
+
+m6 = LinearRegression()
+m6.fit(x6_degree4,y)
+
+y6_predict = m6.predict(x6_degree4)
+
+print("Model 6 - Charges ~ Age Polynomial Model of Degree 4")
+print("Model 6 Intercept: ",m6.intercept_ )
+print("Model 6 Slope: ", m6.coef_)
+print("Model 6 R^2:", m6.score(x6_degree4,y))
+print("Model 6 MSE: ",mean_squared_error(y,y6_predict))
+
+```
+
+The R^2 of Model 6 (Age - Polynomial Model of Degree 4) changed from 0.099 to 0.108 and the MSE lowered to 125 million from 126 million. 
+
+
+```{python}
+# Model 7: Polynomial Model of Degree 12
+degree12 = PolynomialFeatures(degree=12, include_bias=False)
+
+x7_degree12 = degree12.fit_transform(myData[["age"]])
+y = myData["charges"]
+
+m7 = LinearRegression()
+m7.fit(x7_degree12,y)
+
+y7_predict = m7.predict(x7_degree12)
+
+print("Model 7 - Charges ~ Age Polynomial Model of Degree 12")
+print("Model 7 Intercept: ",m7.intercept_ )
+print("Model 7 Slope: ", m7.coef_)
+print("Model 7 R^2:", m7.score(x7_degree12,y))
+print("Model 7 MSE: ",mean_squared_error(y,y7_predict))
+
+```
+
+The R^2 of Model 7 (Age - Polynomial Model of Degree 12) went from 0.099 to 0.107 and the MSE went down to 125 million from 126 million. 
+
+Based on the MSE and R-Squared values, Model 4 (Age + BMI) is the best model compared to the other models, but it is not necessarily the best model overall.
+
+
+```{python}
+age_range = np.linspace(myData["age"].min(), myData["age"].max(), 250)
+age_range = pd.DataFrame({"age": np.linspace(myData["age"].min(), myData["age"].max(), 250)})
+age_range_degree12 = degree12.fit_transform(age_range)
+age_range["charges_predictions"] = m7.predict(age_range_degree12)
+
+
+(
+    ggplot(myData, aes(x="age",y="charges"))
+    +geom_point(alpha=0.7)
+    +geom_line(age_range, aes(x="age",y="charges_predictions"), color = "red")
+    +labs(title = "Age vs. Charges")
+)
+```
+
+## Part Four: New data
+
+
+```{python}
+myData2 = pd.read_csv("https://www.dropbox.com/s/sky86agc4s8c6qe/insurance_costs_2.csv?dl=1")
+myData2 = pd.get_dummies(myData2, columns = ["sex","smoker"],drop_first=True)
+myData2["sex_male"] = myData2["sex_male"].astype(int)
+myData2["smoker_yes"] = myData2["smoker_yes"].astype(int)
+myData2["smoker_label"] = myData2["smoker_yes"].map({0:"No", 1:"Yes"})
+myData2["sex_label"] = myData2["sex_male"].map({0: "Female", 1: "Male"})
+
+myData2 = myData2.dropna()
+
+```
+
+
+```{python}
+#New Model 1 - Charges ~ Age
+x1 = myData[["age"]]
+y = myData["charges"]
+
+new_x1 = myData2[["age"]]
+new_y = myData2["charges"]
+
+new_m1 = LinearRegression()
+new_m1.fit(x1,y)
+
+y1_predict = new_m1.predict(new_x1)
+
+print("New Model 1 - Charges ~ Age")
+print("New Model 1 Intercept: ",new_m1.intercept_ )
+print("New Model 1 Slope: ", new_m1.coef_)
+print("New Model 1 R^2:", new_m1.score(x1,y))
+print("New Model 1 MSE: ",mean_squared_error(new_y,y1_predict))
+```
+
+
+```{python}
+#New Model 2 - Charges ~ Age + BMI
+x2 = myData[["age","bmi"]]
+y = myData["charges"]
+
+new_x2 = myData2[["age","bmi"]]
+new_y = myData2["charges"]
+
+new_m2 = LinearRegression()
+new_m2.fit(x2,y)
+
+y2_predict = new_m2.predict(new_x2)
+
+print("New Model 2 - Charges ~ Age + BMI")
+print("New Model 2 Intercept: ",new_m2.intercept_ )
+print("New Model 2 Slope: ", new_m2.coef_)
+print("New Model 2 R^2:", new_m2.score(x2,y))
+print("New Model 2 MSE: ",mean_squared_error(new_y,y2_predict))
+```
+
+
+```{python}
+#New Model 3 - Charges ~ Age + BMI + Smoker
+x3 = myData[["age","bmi","smoker_yes"]]
+y = myData["charges"]
+
+new_x3 = myData2[["age","bmi","smoker_yes"]]
+new_y = myData2["charges"]
+
+new_m3 = LinearRegression()
+new_m3.fit(x3,y)
+
+y3_predict = new_m3.predict(new_x3)
+
+print("New Model 3 - Charges ~ Age + BMI + Smoker")
+print("New Model 3 Intercept: ",new_m3.intercept_ )
+print("New Model 3 Slope: ", new_m3.coef_)
+print("New Model 3 R^2:", new_m3.score(x3,y))
+print("New Model 3 MSE: ",mean_squared_error(new_y,y3_predict))
+```
+
+```{python}
+#New Model 4 - Charges ~ (Age + BMI): Smoker
+myData["age_smoker"] = myData["age"] * myData["smoker_yes"]
+myData["bmi_smoker"] = myData["bmi"] * myData["smoker_yes"]
+
+myData2["age_smoker"] = myData2["age"] * myData2["smoker_yes"]
+myData2["bmi_smoker"] = myData2["bmi"] * myData2["smoker_yes"]
+
+x4 = myData[["age_smoker","bmi_smoker"]]
+y = myData["charges"]
+
+new_x4 = myData2[["age_smoker","bmi_smoker"]]
+new_y = myData2["charges"]
+
+new_m4 = LinearRegression()
+new_m4.fit(x4,y)
+
+y4_predict = new_m4.predict(new_x4)
+
+print("New Model 4 - Charges ~ (Age + BMI): Smoker")
+print("New Model 4 Intercept: ",new_m4.intercept_ )
+print("New Model 4 Slope: ", new_m4.coef_)
+print("New Model 4 R^2:", new_m4.score(x4,y))
+print("New Model 4 MSE: ",mean_squared_error(new_y,y4_predict))
+```
+
+```{python}
+#New Model 5 - Charges ~ (Age + BMI) * Smoker
+x5 = myData[["age","bmi","smoker_yes","age_smoker","bmi_smoker"]]
+y = myData["charges"]
+
+new_x5 = myData2[["age","bmi","smoker_yes","age_smoker","bmi_smoker"]]
+new_y = myData2["charges"]
+
+new_m5 = LinearRegression()
+new_m5.fit(x5,y)
+
+y5_predict = new_m5.predict(new_x5)
+
+print("New Model 5 - Charges ~ (Age + BMI) * Smoker")
+print("New Model 5 Intercept: ",new_m5.intercept_ )
+print("New Model 5 Slope: ", new_m5.coef_)
+print("New Model 5 R^2:", new_m5.score(x5,y))
+print("New Model 5 MSE: ",mean_squared_error(new_y,y5_predict))
+```
+
+Based on the MSE and the R-squared values of each model, the best model that fits the data best is Model 5 because it has the highest R-squared value of 0.867 and the lowest MSE of 21.8 million. 
+
+
+```{python}
+myData2["predicted"] = new_m5.predict(new_x5)
+myData2["residuals"] = myData2["charges"] - myData2["predicted"]
+
+(
+    ggplot(myData2, aes(x="predicted",y="residuals"))
+    +geom_point(alpha = 0.7 ,color= "red")
+    +geom_hline(yintercept=0, color = "green")
+    +labs(title = "Model 5 Residuals Plot. Charges ~ (Age + BMI) * Smoker")
+)
+
+```
+
+## Part Five: Full Exploration
+
+```{python}
+myData["age_smoker"] = myData["age"] * myData["smoker_yes"]
+myData["bmi_smoker"] = myData["bmi"] * myData["smoker_yes"]
+
+myData2["age_smoker"] = myData2["age"] * myData2["smoker_yes"]
+myData2["bmi_smoker"] = myData2["bmi"] * myData2["smoker_yes"]
+
+
+models = {
+    "Model 1": ["age"],
+    "Model 2": ["age", "bmi"],
+    "Model 3": ["age", "bmi", "smoker_yes"],
+    "Model 4": ["age_smoker", "bmi_smoker"],
+    "Model 5": ["age", "bmi", "smoker_yes", "age_smoker", "bmi_smoker"]
+}
+
+rows = []
+
+for name, Xcols in models.items():
+    X_train = myData[Xcols]
+    y_train = myData["charges"]
+
+    X_test = myData2[Xcols]
+    y_test = myData2["charges"]
+
+    model = LinearRegression().fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+
+    test_mse = mean_squared_error(y_test, y_pred)
+    test_r2 = r2_score(y_test, y_pred)
+
+    myData2[f"{name}_predict"] = y_pred
+
+    rows.append({
+        "Model": name,
+        "Test MSE": test_mse,
+        "Test R²": test_r2
+    })
+
+test_error = pd.DataFrame(rows)
+test_error
+
+
+
+
+```
+The best model is polynomial of degree 2 since it has the lowest MSE. 
+
+```{python}
+
+
+
+```
+```{python}
+
+X2_train = myData[["age", "bmi"]]
+y2_train = myData["charges"]
+
+X2_test = myData2[["age", "bmi"]]
+y2_test = myData2["charges"]
+
+model2 = LinearRegression().fit(X2_train, y2_train)
+
+myData2["predicted_model2"] = model2.predict(X2_test)
+myData2["residuals_model2"] = myData2["charges"] - myData2["predicted_model2"]
+
+(
+    ggplot(myData2, aes(x="predicted_model2", y="residuals_model2"))
+    + geom_point(alpha=0.7, color="red")
+    + geom_hline(yintercept=0, color="green")
+    + labs(
+        title="Model 2 Residual Plot: Charges ~ Age + BMI",
+        x="Predicted Charges",
+        y="Residuals"
+    )
+    + theme_bw()
+)
+
+
+```
