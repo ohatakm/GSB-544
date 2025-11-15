@@ -1,0 +1,430 @@
+---
+title: "Lab 6: Variable Selection and Regularization"
+author: "Kelly Ohata"
+format: 
+  html:
+    code-fold: show
+    embed-resources: true
+execute:
+  warning: false
+  output: true
+---
+
+# Part I: Different Model Specs
+
+## A. Regression without regularization
+
+1.  Create a pipeline that includes *all* the columns as predictors for `Salary`, and performs ordinary linear regression
+
+2.  Fit this pipeline to the full dataset, and interpret a few of the most important coefficients.
+
+3.  Use cross-validation to estimate the MSE you would expect if you used this pipeline to predict 1989 salaries.
+
+```{python}
+# | code-fold: true 
+import pandas as pd
+import numpy as np
+from sklearn.pipeline import Pipeline
+from sklearn.compose import make_column_selector, ColumnTransformer
+from sklearn.preprocessing import StandardScaler, OneHotEncoder, PolynomialFeatures
+from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
+from sklearn.model_selection import train_test_split, cross_val_score, GridSearchCV
+from sklearn.metrics import r2_score
+```
+```{python}
+hitters = pd.read_csv("Hitters.csv")
+
+hitters = hitters.dropna()
+
+# define X and y
+X = hitters.drop(["Salary"], axis=1)
+y = hitters["Salary"]
+
+# build the ColumnTransformer
+ct = ColumnTransformer(
+    [
+        ("dummify",
+         OneHotEncoder(sparse_output=False, handle_unknown="ignore"),
+         make_column_selector(dtype_include=object)),
+        ("standardize",
+         StandardScaler(),
+         make_column_selector(dtype_include=np.number))
+    ],
+    remainder="passthrough"
+).set_output(transform="pandas")
+
+# pipeline for ordinary linear regression
+lr_pipeline = Pipeline(
+    [
+        ("preprocessing", ct),
+        ("linear_regression", LinearRegression())
+    ]
+)
+
+# fit the pipeline to the full dataset
+lr_pipeline_fitted = lr_pipeline.fit(X, y)
+
+
+```
+
+```{python}
+coef = pd.DataFrame({
+    "Feature": lr_pipeline_fitted.named_steps["preprocessing"].get_feature_names_out(),
+    "Coefficient": lr_pipeline_fitted.named_steps["linear_regression"].coef_
+})
+coef.sort_values(by="Coefficient", key=abs, ascending=False).head(10)
+```
+
+```{python}
+# cross-validation to estimate expected MSE
+from sklearn.metrics import mean_squared_error
+
+cv_mse = -cross_val_score(lr_pipeline, X, y,
+                          cv=5,
+                          scoring="neg_mean_squared_error")
+cv_mse.mean()
+
+print("Expected MSE using Linear Regression:", cv_mse.mean())
+```
+
+## B. Ridge regression
+
+
+1.  Create a pipeline that includes *all* the columns as predictors for `Salary`, and performs ordinary ridge regression
+
+2.  Use cross-validation to **tune** the $\lambda$ hyperparameter.
+
+3.  Fit the pipeline with your chosen $\lambda$ to the full dataset, and interpret a few of the most important coefficients.
+
+4.  Report the MSE you would expect if you used this pipeline to predict 1989 salaries.
+
+```{python}
+ridge_pipeline = Pipeline(
+    [
+        ("preprocessing", ct),
+        ("ridge_regression", Ridge())
+    ]
+).set_output(transform="pandas")
+
+# cross-validation to tune alpha
+alphas = {"ridge_regression__alpha": np.array([100, 10, 1, 0.1, 0.01])}
+gscv = GridSearchCV(ridge_pipeline, param_grid=alphas, cv=5, scoring="neg_mean_squared_error")
+gscv_fitted = gscv.fit(X, y)
+
+# extract results and best alpha
+cv_results = pd.DataFrame(gscv_fitted.cv_results_)
+best_alpha = gscv_fitted.best_params_["ridge_regression__alpha"]
+best_mse = -gscv_fitted.best_score_
+
+print("Best alpha:", best_alpha)
+print("Cross-validated MSE:", best_mse)
+
+```
+
+```{python}
+# fit full model with best alpha + coefficients
+ridge_best = Ridge(alpha=best_alpha)
+ridge_best_pipeline = Pipeline(
+    [
+        ("preprocessing", ct),
+        ("ridge_regression", ridge_best)
+    ]
+).fit(X, y)
+
+coef = pd.DataFrame({
+    "Feature": ridge_best_pipeline.named_steps["preprocessing"].get_feature_names_out(),
+    "Coefficient": ridge_best_pipeline.named_steps["ridge_regression"].coef_
+})
+coef.sort_values(by="Coefficient", key=abs, ascending=False).head(10)
+```
+
+```{python}
+# best MSE
+cv_mse = -cross_val_score(ridge_best_pipeline, X, y, cv=5, scoring="neg_mean_squared_error")
+
+print("Expected MSE using Ridge Regression:", cv_mse.mean())
+```
+## C. Lasso Regression
+
+1.  Create a pipeline that includes *all* the columns as predictors for `Salary`, and performs ordinary ridge regression
+
+2.  Use cross-validation to **tune** the $\lambda$ hyperparameter.
+
+3.  Fit the pipeline with your chosen $\lambda$ to the full dataset, and interpret a few of the most important coefficients.
+
+4.  Report the MSE you would expect if you used this pipeline to predict 1989 salaries.
+
+```{python}
+lasso_pipeline = Pipeline(
+    [
+        ("preprocessing", ct),
+        ("lasso_regression", Lasso())
+    ]
+).set_output(transform="pandas")
+
+# cross-validation to tune alpha
+alphas = {"lasso_regression__alpha": np.array([100, 10, 1, 0.1, 0.01])}
+gscv = GridSearchCV(lasso_pipeline, param_grid=alphas, cv=5, scoring="neg_mean_squared_error")
+gscv_fitted = gscv.fit(X, y)
+
+# 6. Extract results and best alpha
+cv_results = pd.DataFrame(gscv_fitted.cv_results_)
+best_alpha = gscv_fitted.best_params_["lasso_regression__alpha"]
+best_mse = -gscv_fitted.best_score_
+
+print("Best alpha:", best_alpha)
+print("Cross-validated MSE:", best_mse)
+```
+
+```{python}
+# fit full model
+lasso_best = Lasso(alpha=best_alpha)
+lasso_best_pipeline = Pipeline(
+    [
+        ("preprocessing", ct),
+        ("lasso_regression", lasso_best)
+    ]
+).fit(X, y)
+
+coef = pd.DataFrame({
+    "Feature": lasso_best_pipeline.named_steps["preprocessing"].get_feature_names_out(),
+    "Coefficient": lasso_best_pipeline.named_steps["lasso_regression"].coef_
+})
+coef.sort_values(by="Coefficient", key=abs, ascending=False).head(10)
+print("Expected MSE using LASSO Regression:", cv_mse.mean())
+```
+
+```{python}
+cv_mse = -cross_val_score(lasso_best_pipeline, X, y, cv=5, scoring="neg_mean_squared_error")
+
+```
+## D. Elastic Net
+
+1.  Create a pipeline that includes *all* the columns as predictors for `Salary`, and performs ordinary ridge regression
+
+2.  Use cross-validation to **tune** the $\lambda$ and $\alpha$ hyperparameters.
+
+3.  Fit the pipeline with your chosen hyperparameters to the full dataset, and interpret a few of the most important coefficients.
+
+4.  Report the MSE you would expect if you used this pipeline to predict 1989 salaries.
+
+```{python}
+elastic_pipeline = Pipeline(
+    [
+        ("preprocessing", ct),
+        ("elastic_net", ElasticNet(max_iter=10000))
+    ]
+).set_output(transform="pandas")
+
+# cross-validation to tune lambda and l1_ratio
+param_grid = {
+    "elastic_net__alpha": [0.01, 0.1, 1, 10, 100],
+    "elastic_net__l1_ratio": [0, 0.25, 0.5, 0.75, 1]
+}
+
+gscv = GridSearchCV(elastic_pipeline, param_grid=param_grid,
+                    cv=5, scoring="neg_mean_squared_error")
+gscv_fitted = gscv.fit(X, y)
+
+# extract results and best parameters
+cv_results = pd.DataFrame(gscv_fitted.cv_results_)
+best_lambda = gscv_fitted.best_params_["elastic_net__alpha"]
+best_l1_ratio = gscv_fitted.best_params_["elastic_net__l1_ratio"]
+best_mse = -gscv_fitted.best_score_
+
+print("Best lambda:", best_lambda)
+print("Best l1_ratio:", best_l1_ratio)
+print("Cross-validated MSE:", best_mse)
+
+
+```
+
+```{python}
+# Fit full model
+elastic_best = ElasticNet(alpha=best_lambda, l1_ratio=best_l1_ratio, max_iter=10000)
+elastic_best_pipeline = Pipeline(
+    [
+        ("preprocessing", ct),
+        ("elastic_net", elastic_best)
+    ]
+).fit(X, y)
+
+coef = pd.DataFrame({
+    "Feature": elastic_best_pipeline.named_steps["preprocessing"].get_feature_names_out(),
+    "Coefficient": elastic_best_pipeline.named_steps["elastic_net"].coef_
+})
+coef.sort_values(by="Coefficient", key=abs, ascending=False).head(10)
+```
+
+```{python}
+# expected MSE
+cv_mse = -cross_val_score(elastic_best_pipeline, X, y, cv=5, scoring="neg_mean_squared_error")
+print("Expected MSE using Elastic Net:", cv_mse.mean())
+```
+
+# Part II. Variable Selection
+
+Based on the above results, decide on:
+
+-   Which *numeric* variable is most important.
+
+-   Which *five* numeric variables are most important
+
+-   Which *categorical* variable is most important
+
+```{python}
+coef = pd.DataFrame({
+    "Feature": lasso_best_pipeline.named_steps["preprocessing"].get_feature_names_out(),
+    "Coefficient": lasso_best_pipeline.named_steps["lasso_regression"].coef_
+})
+
+# Sort by absolute value to find most important variables
+coef["abs_coef"] = coef["Coefficient"].abs()
+coef = coef.sort_values(by="abs_coef", ascending=False)
+
+# View top variables
+coef.head(10)
+```
+Top numeric variable: CRuns
+Top five numeric variables: CRuns, Hits, AtBat, CRBI, CWalks
+Top categorical variable: Division_E
+
+
+For **each** of the four model specifications, compare the following possible feature sets:
+
+1.  Using only the one best numeric variable.
+
+2.  Using only the five best variables.
+
+3.  Using the five best numeric variables *and* their interactions with the one best categorical variable.
+
+Report which combination of features and model performed best, based on the validation metric of MSE.
+
+(Note: $\lambda$ and $\alpha$ must be re-tuned for each feature set.)
+```{python}
+# One best numeric variable
+X_one = X[["CRuns"]]
+
+# Five best numeric variables
+X_five = X[["CRuns", "Hits", "AtBat", "CRBI", "CWalks"]]
+
+# Five best numeric + best categorical
+X_five_plus_cat = X[["CRuns", "Hits", "AtBat", "CRBI", "CWalks", "Division"]]
+
+# Calculate cross-validated MSE for each model
+cv_mse_lr_one = -cross_val_score(lr_pipeline, X_one, y, cv=5,
+                                 scoring="neg_mean_squared_error").mean()
+cv_mse_ridge_one = -cross_val_score(ridge_best_pipeline, X_one, y, cv=5,
+                                    scoring="neg_mean_squared_error").mean()
+cv_mse_lasso_one = -cross_val_score(lasso_best_pipeline, X_one, y, cv=5,
+                                    scoring="neg_mean_squared_error").mean()
+cv_mse_elastic_one = -cross_val_score(elastic_best_pipeline, X_one, y, cv=5,
+                                      scoring="neg_mean_squared_error").mean()
+
+cv_mse_lr_five = -cross_val_score(lr_pipeline, X_five, y, cv=5,
+                                  scoring="neg_mean_squared_error").mean()
+cv_mse_ridge_five = -cross_val_score(ridge_best_pipeline, X_five, y, cv=5,
+                                     scoring="neg_mean_squared_error").mean()
+cv_mse_lasso_five = -cross_val_score(lasso_best_pipeline, X_five, y, cv=5,
+                                     scoring="neg_mean_squared_error").mean()
+cv_mse_elastic_five = -cross_val_score(elastic_best_pipeline, X_five, y, cv=5,
+                                       scoring="neg_mean_squared_error").mean()
+
+cv_mse_lr_fivecat = -cross_val_score(lr_pipeline, X_five_plus_cat, y, cv=5,
+                                     scoring="neg_mean_squared_error").mean()
+cv_mse_ridge_fivecat = -cross_val_score(ridge_best_pipeline, X_five_plus_cat, y, cv=5,
+                                        scoring="neg_mean_squared_error").mean()
+cv_mse_lasso_fivecat = -cross_val_score(lasso_best_pipeline, X_five_plus_cat, y, cv=5,
+                                        scoring="neg_mean_squared_error").mean()
+cv_mse_elastic_fivecat = -cross_val_score(elastic_best_pipeline, X_five_plus_cat, y, cv=5,
+                                          scoring="neg_mean_squared_error").mean()
+
+
+```
+The lowest validation MSE comes from Elastic Net (and LASSO) using the five best numeric variables
+
+```{python}
+# | code-fold: true
+print("Expected MSE using Linear Regression (one best):", cv_mse_lr_one)
+print("Expected MSE using Ridge Regression (one best):", cv_mse_ridge_one)
+print("Expected MSE using LASSO Regression (one best):", cv_mse_lasso_one)
+print("Expected MSE using Elastic Net Regression (one best):", cv_mse_elastic_one)
+
+print("Expected MSE using Linear Regression (five best):", cv_mse_lr_five)
+print("Expected MSE using Ridge Regression (five best):", cv_mse_ridge_five)
+print("Expected MSE using LASSO Regression (five best):", cv_mse_lasso_five)
+print("Expected MSE using Elastic Net Regression (five best):", cv_mse_elastic_five)
+
+print("Expected MSE using Linear Regression (five best + cat):", cv_mse_lr_fivecat)
+print("Expected MSE using Ridge Regression (five best + cat):", cv_mse_ridge_fivecat)
+print("Expected MSE using LASSO Regression (five best + cat):", cv_mse_lasso_fivecat)
+print("Expected MSE using Elastic Net Regression (five best + cat):", cv_mse_elastic_fivecat)
+
+```
+# Part III. Discussion
+
+## A. Ridge
+
+Compare your Ridge models with your ordinary regression models. How did your coefficients compare? Why does this make sense?
+
+```{python}
+coef_compare = pd.DataFrame()
+coef_compare["Linear"] = lr_pipeline_fitted.named_steps["linear_regression"].coef_
+coef_compare["Ridge"] = ridge_best_pipeline.named_steps["ridge_regression"].coef_
+coef_compare["Diff"] = coef_compare["Linear"] - coef_compare["Ridge"]
+
+coef_compare.head(10)
+```
+The Ridge coefficients are smaller than the OLS ones. This makes sense because Ridge adds a penalty that shrinks large coefficients to reduce overfitting.
+
+## B. LASSO
+
+Compare your LASSO model in I with your three LASSO models in II. Did you get the same $\lambda$ results? Why does this make sense? Did you get the same MSEs? Why does this make sense?
+
+The alpha values and MSEs were different. This makes sense because each model used different predictors, changing how much regularization was needed and how well the model fit the data.
+
+## C. Elastic Net
+
+Compare your MSEs for the Elastic Net models with those for the Ridge and LASSO models. Why does it make sense that Elastic Net always "wins"?
+
+The Elastic Net model had the lowest MSE. It makes sense that it always "wins" because it combines the strengths of both Ridge and LASSO, balancing coefficient shrinkage and variable selection.
+
+# Part IV: Final Model
+
+Fit your final best pipeline on the full dataset, and summarize your results in a few short sentences and a plot.
+```{python}
+from plotnine import *
+
+final_model = elastic_best_pipeline.fit(X, y)
+
+# training MSE + RMSE
+y_pred = final_model.predict(X)
+mse_train = mean_squared_error(y, y_pred)
+rmse_train = np.sqrt(mse_train)
+
+# summary
+print("Final Model Summary:")
+print("Model: Elastic Net")
+print("Feature Set: All Predictors")
+print("Training MSE:", round(mse_train, 2))
+print("Training RMSE:", round(rmse_train, 2))
+
+plot_df = pd.DataFrame({
+    "Actual": y,
+    "Predicted": y_pred
+})
+
+# Actual vs Predicted scatter plot
+(
+    ggplot(plot_df, aes(x="Actual", y="Predicted"))
+    + geom_point(alpha=0.6)
+    + geom_abline(slope=1, intercept=0, linetype="dashed", color="black")
+    + labs(
+        title="Elastic Net - Actual vs. predicted",
+        x="Actual Values",
+        y="Predicted Values"
+    )
+    + theme_bw()
+)
+```
+The final Elastic Net model was trained on the full dataset using all predictors. It resulted in a training MSE of 93,469.5 and an RMSE of 305.73, showing a good overall fit. The scatter plot shows that most predictions fall close to the perfect prediction line, indicating strong performance with only moderate spread, suggesting the model generalizes well without severe overfitting.
