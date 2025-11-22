@@ -1,0 +1,336 @@
+---
+title: "Lab 7: Heart Attack"
+author: "Kelly Ohata"
+format: 
+  html:
+    code-fold: true
+    embed-resources: true
+execute:
+  warning: false
+---
+```{python}
+import pandas as pd
+
+ha = pd.read_csv("https://www.dropbox.com/s/aohbr6yb9ifmc8w/heart_attack.csv?dl=1")
+ha.head()
+def evaluate_model(model, name):
+    cv_auc = cross_val_score(model, X_train, y_train, scoring="roc_auc", cv=5).mean()
+    model.fit(X_train, y_train)
+    preds = model.predict(X_test)
+    probs = model.predict_proba(X_test)[:, 1]
+
+    test_auc = roc_auc_score(y_test, probs)
+    cm = confusion_matrix(y_test, preds)
+
+    print(name)
+    print(f"Cross-validated ROC AUC: {cv_auc:.4f}")
+    print(f"Test ROC AUC:          {test_auc:.4f}")
+    print("Confusion Matrix:")
+    print(cm)
+
+    return probs
+```
+
+---
+
+# Part One: Fitting Models
+
+```{python}
+import numpy as np
+from sklearn.model_selection import *
+from sklearn.preprocessing import *
+from sklearn.pipeline import *
+from sklearn.metrics import *
+from sklearn.neighbors import *
+from sklearn.linear_model import *
+from sklearn.tree import *
+
+X = ha.drop(columns=["output"])
+y = ha["output"]
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, stratify=y, random_state=42
+)
+```
+
+---
+
+## Q1: KNN
+
+```{python}
+k_values = [1, 3, 5, 7, 9, 11, 15]
+knn_results = []
+
+for k in k_values:
+    pipe = Pipeline([
+        ("scaler", StandardScaler()),
+        ("knn", KNeighborsClassifier(n_neighbors=k))
+    ])
+    auc = cross_val_score(pipe, X_train, y_train, scoring="roc_auc", cv=5).mean()
+    knn_results.append((k, auc))
+
+knn_results
+```
+
+```{python}
+best_k = max(knn_results, key=lambda x: x[1])[0]
+best_k
+```
+
+```{python}
+knn_model = Pipeline([
+    ("scaler", StandardScaler()),
+    ("knn", KNeighborsClassifier(n_neighbors=best_k))
+])
+
+knn_probs = evaluate_model(knn_model, "KNN")
+```
+
+**Interpretation:**
+k = 15 had the highest cross-validated ROC AUC (0.8653), which was better than all the other k values tested.
+The test ROC AUC was 0.6956, and the confusion matrix was [[14, 12], [9, 20]].
+This value of k gave the smoothest and most stable predictions without overfitting.
+
+---
+
+## Q2: Logistic Regression
+
+```{python}
+C_values = [0.001, 0.01, 0.1, 1, 10, 100]
+log_results = []
+
+for c in C_values:
+    pipe = Pipeline([
+        ("scaler", StandardScaler()),
+        ("logreg", LogisticRegression(C=c, max_iter=5000))
+    ])
+    auc = cross_val_score(pipe, X_train, y_train, scoring="roc_auc", cv=5).mean()
+    log_results.append((c, auc))
+
+log_results
+```
+
+```{python}
+best_C = max(log_results, key=lambda x: x[1])[0]
+best_C
+```
+
+```{python}
+log_model = Pipeline([
+    ("scaler", StandardScaler()),
+    ("logreg", LogisticRegression(C=best_C, max_iter=5000))
+])
+
+log_probs = evaluate_model(log_model, "Logistic Regression")
+```
+
+**Interpretation:**
+C = 0.01 produced the strongest cross-validated ROC AUC (0.8645).
+On the test set, the ROC AUC was 0.7958, with confusion matrix [[16, 10], [4, 25]].
+This C value balanced regularization and performance the best.
+
+---
+
+## Q3: Decision Tree
+
+```{python}
+depth_values = [2,3,4,5,6,8,10]
+tree_results = []
+
+for d in depth_values:
+    pipe = Pipeline([
+        ("tree", DecisionTreeClassifier(max_depth=d, random_state=42))
+    ])
+    auc = cross_val_score(pipe, X_train, y_train, scoring="roc_auc", cv=5).mean()
+    tree_results.append((d, auc))
+
+tree_results
+```
+
+```{python}
+best_depth = max(tree_results, key=lambda x: x[1])[0]
+best_depth
+```
+
+```{python}
+tree_model = Pipeline([
+    ("tree", DecisionTreeClassifier(max_depth=best_depth, random_state=42))
+])
+
+tree_probs = evaluate_model(tree_model, "Decision Tree")
+```
+
+**Interpretation:**
+A max depth of 4 gave the highest cross-validated ROC AUC (0.7803).
+On the test data, the ROC AUC was 0.7142 with confusion matrix [[18, 8], [8, 21]].
+Depths smaller than 4 underfit and deeper depths started overfitting, so depth = 4 was the best trade-off.
+
+---
+
+## Q4: Interpretation
+
+```{python}
+coef_table = pd.DataFrame({
+    "feature": X.columns,
+    "coef": log_model.named_steps["logreg"].coef_[0]
+}).sort_values("coef", key=np.abs, ascending=False) # got online help for here
+
+imp_table = pd.DataFrame({
+    "feature": X.columns,
+    "importance": tree_model.named_steps["tree"].feature_importances_
+}).sort_values("importance", ascending=False)
+
+coef_table, imp_table
+```
+
+**Summary:**
+The two largest logistic coefficients were thalach (0.2816) and cp (0.2504), meaning higher heart rate and chest pain type increased risk.
+The decision tree relied most on cp (0.4461), thalach (0.1717), and age (0.1239).
+Restecg had almost no effect (importance = 0.0000), meaning the tree never used it to split.
+---
+
+## Q5: ROC Curves
+
+```{python}
+from plotnine import *
+
+knn_fpr, knn_tpr, _ = roc_curve(y_test, knn_probs)
+log_fpr, log_tpr, _ = roc_curve(y_test, log_probs)
+tree_fpr, tree_tpr, _ = roc_curve(y_test, tree_probs)
+
+roc_df = pd.DataFrame({
+    "fpr": np.concatenate([knn_fpr, log_fpr, tree_fpr]),
+    "tpr": np.concatenate([knn_tpr, log_tpr, tree_tpr]),
+    "model": (["KNN"] * len(knn_fpr)) +
+             (["Logistic Regression"] * len(log_fpr)) +
+             (["Decision Tree"] * len(tree_fpr))
+})
+
+(
+    ggplot(roc_df, aes(x="fpr", y="tpr", color="model"))
+    + geom_line(size=1.2)
+    + geom_abline(color="gray")
+    + labs(title="ROC Curves", x="False Positive Rate", y="True Positive Rate")
+    + theme_bw()
+)
+```
+The Logistic Regression ROC curve stayed highest overall, so it performed best.
+KNN was next, and the Decision Tree curve stayed the lowest.
+This matches the test ROC AUC scores.
+
+# Part Two: Metrics
+
+```{python}
+specificity_scorer = make_scorer(recall_score, pos_label=0)
+recall_scorer      = make_scorer(recall_score, pos_label=1)
+precision_scorer   = make_scorer(precision_score, pos_label=1)
+
+def compute_metrics(model, name):
+    spec = cross_val_score(model, X_train, y_train, cv=5, scoring=specificity_scorer).mean()
+    rec  = cross_val_score(model, X_train, y_train, cv=5, scoring=recall_scorer).mean()
+    prec = cross_val_score(model, X_train, y_train, cv=5, scoring=precision_scorer).mean()
+
+    print(name)
+    print(f"Specificity: {spec:.4f}")
+    print(f"Recall:      {rec:.4f}")
+    print(f"Precision:   {prec:.4f}")
+```
+
+```{python}
+compute_metrics(knn_model, "KNN")
+compute_metrics(log_model, "Logistic Regression")
+compute_metrics(tree_model, "Decision Tree")
+```
+
+---
+
+# Part Three: Discussion
+
+**Q1: The hospital wants to avoid false negatives (missed high-risk patients).**
+Metric to use:
+Recall, because it measures how many actual high-risk patients the model correctly identifies.
+Recommended model:
+Logistic Regression, because it had the highest recall (0.8967).
+Expected score on new patients:
+We should expect recall around 0.89, based on the cross-validated remember value (0.8967) and the validation recall (0.7895).
+**Q2: The hospital wants to avoid false positives (wasting beds on low-risk patients).**
+Metric to use:
+Precision, because it measures how many predicted high-risk patients actually are high-risk.
+Recommended model:
+KNN, because it had the highest precision (0.7743).
+Expected score on new patients:
+We should expect precision around 0.77–0.88, based on cross-validated precision (0.7743) and the validation precision (0.8750).
+**Q3: The hospital wants to understand which features matter biologically.**
+Metric to use:
+Interpretability — coefficients or importances, not predictive scores.
+Recommended model:
+Logistic Regression, because the coefficients clearly show direction and strength of each variable.
+Expected score on new patients:
+Its predictive performance (test AUC = 0.7958, validation AUC = 0.9234) shows it still performs well while remaining interpretable.
+**Q4: The hospital wants a good overall model to compare new doctors to.**
+Metric to use:
+ROC AUC or accuracy, because they summarize overall model performance.
+Recommended model:
+Logistic Regression, because it had the strongest test ROC AUC (0.7958) and remained strong on validation (0.9234).
+Expected score on new patients:
+We should expect ROC AUC near 0.80-0.92, based on the test and validation results.
+
+---
+
+# Part Four: Validation
+
+```{python}
+ha_val = pd.read_csv("https://www.dropbox.com/s/jkwqdiyx6o6oad0/heart_attack_validation.csv?dl=1")
+
+X_val = ha_val.drop(columns=["output"])
+y_val = ha_val["output"]
+
+def validate(model, name):
+    preds = model.predict(X_val)
+    probs = model.predict_proba(X_val)[:, 1]
+
+    cm   = confusion_matrix(y_val, preds)
+    auc  = roc_auc_score(y_val, probs)
+    prec = precision_score(y_val, preds)
+    rec  = recall_score(y_val, preds)
+
+    print(name)
+    print("Confusion Matrix:")
+    print(cm)
+    print(f"AUC: {auc:.4f}  Precision: {prec:.4f}  Recall: {rec:.4f}")
+```
+
+```{python}
+validate(knn_model, "KNN")
+validate(log_model, "Logistic Regression")
+validate(tree_model, "Decision Tree")
+```
+
+**Validation Summary:**
+KNN: AUC = 0.9426, precision = 0.8750, recall = 0.7368
+Logistic Regression: AUC = 0.9234, precision = 0.8824, recall = 0.7895
+Decision Tree: AUC = 0.7990, precision = 0.9333, recall = 0.7368
+
+The ordering matched the earlier results. Logistic Regression and KNN stayed strong, and the tree stayed the weakest.
+
+---
+
+# Part Five: Cohen’s Kappa
+
+```{python}
+from sklearn.metrics import cohen_kappa_score
+
+def compute_kappa(model, name):
+    preds = model.predict(X_val)
+    kappa = cohen_kappa_score(y_val, preds)
+    print(f"{name} Kappa: {kappa:.4f}")
+```
+
+```{python}
+compute_kappa(knn_model, "KNN")
+compute_kappa(log_model, "Logistic Regression")
+compute_kappa(tree_model, "Decision Tree")
+```
+
+**Kappa Interpretation:**
+
+All three models performed better than chance. The tree having the highest kappa makes sense because its validation confusion matrix was the most balanced, so its predictions matched the true labels more consistently. Even though the tree wasn’t the best overall model, kappa specifically measures agreement beyond chance, and the tree’s harder, more confident splits tend to boost that metric. The differences were still small and don’t change any of the earlier conclusions.
